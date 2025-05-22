@@ -13,7 +13,9 @@ function App() {
 
   const fetchSessions = async () => {
     try {
-      const res = await axios.get("http://localhost:5000/sessions");
+      const res = await axios.get(
+        "https://whatsappweb2-0backend.onrender.com/sessions"
+      );
       setAvailableSessions(res.data.sessions);
 
       const sessionIds = res.data.sessions.map((s) => s.sessionId);
@@ -44,7 +46,7 @@ function App() {
     setQrCode("");
     try {
       const res = await axios.post(
-        "http://localhost:5000/create-session",
+        "https://whatsappweb2-0backend.onrender.com/create-session",
         {}, // no sessionId sent, backend creates UUID
         {
           headers: { "Content-Type": "application/json" },
@@ -74,11 +76,14 @@ function App() {
       return;
     }
     try {
-      await axios.post("http://localhost:5000/send-message", {
-        sessionId: selectedSession,
-        number,
-        message,
-      });
+      await axios.post(
+        "https://whatsappweb2-0backend.onrender.com/send-message",
+        {
+          sessionId: selectedSession,
+          number,
+          message,
+        }
+      );
       alert("Message sent!");
       setNumber("");
       setMessage("");
@@ -194,7 +199,7 @@ function App() {
       >
         <h3>API Usage</h3>
         <p>Send a POST request to:</p>
-        <code>http://localhost:5000/send-message</code>
+        <code>https://whatsappweb2-0backend.onrender.com/send-message</code>
         <p>with JSON body:</p>
         <pre
           style={{
