@@ -1,44 +1,104 @@
-.container {
-  max-width: 600px;
-  margin: 20px auto;
+/* App.css */
+body {
   font-family: Arial, sans-serif;
+  background: #f7f7f7;
+  margin: 0;
+  padding: 0;
+}
+
+.container {
+  max-width: 800px;
+  margin: auto;
+  padding: 20px;
 }
 
 .section {
-  margin-bottom: 30px;
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 0 10px #e0e0e0;
 }
 
-.qr {
-  margin-top: 10px;
-  width: 180px;
-  height: 180px;
-  border: 2px solid #333;
-  border-radius: 10px;
+.session-list {
+  display: flex;
+  gap: 15px;
+  flex-wrap: wrap;
 }
 
-input[type="text"],
-textarea {
+.session {
+  cursor: pointer;
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background-color: #ddd;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  box-shadow: 0 0 5px 1px #aaa;
+  text-align: center;
+  padding: 10px;
+}
+
+.session.active {
+  background-color: #4CAF50;
+  box-shadow: 0 0 10px 3px #4CAF50;
+  color: white;
+}
+
+input, textarea {
   width: 100%;
-  margin: 8px 0;
-  padding: 8px;
-  box-sizing: border-box;
-  font-size: 16px;
-  border-radius: 4px;
+  margin-top: 10px;
+  padding: 10px;
   border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+textarea {
   resize: vertical;
+}
+
+.actions {
+  margin-top: 15px;
+  display: flex;
+  justify-content: flex-start;
 }
 
 button {
   padding: 10px 20px;
-  background-color: #4caf50;
-  border: none;
+  background: #4CAF50;
   color: white;
-  font-weight: bold;
-  cursor: pointer;
+  border: none;
   border-radius: 4px;
+  cursor: pointer;
 }
 
 button:disabled {
-  background-color: #999;
+  background: #9E9E9E;
   cursor: not-allowed;
+}
+
+.qr {
+  margin-top: 10px;
+  width: 200px;
+}
+
+.api-section code {
+  background: #eee;
+  padding: 4px 8px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.copy-status.success {
+  color: green;
+  font-weight: bold;
+  margin-left: 10px;
+}
+
+.copy-status.error {
+  color: red;
+  font-weight: bold;
+  margin-left: 10px;
 }

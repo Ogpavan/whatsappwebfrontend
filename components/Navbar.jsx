@@ -1,0 +1,42 @@
+import React from "react";
+
+const Navbar = ({ sessions = [], selectedSession, setSelectedSession }) => {
+  const filteredSessions = sessions.filter(
+    (s) => s.pushname && s.phoneNumber
+  );
+
+  const active = filteredSessions.find((s) => s.sessionId === selectedSession);
+
+  return (
+    <nav className="flex items-center justify-between bg-white border-b px-4 py-3 shadow-sm">
+      <h1 className="text-xl font-semibold text-gray-800">
+        WhatsApp Multi Sender
+      </h1>
+
+      {filteredSessions.length > 0 && active && (
+        <div className="flex items-center space-x-2">
+          {/* Glowing Indicator */}
+          <span className="relative flex h-3 w-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+          </span>
+
+          {/* Dropdown */}
+          <select
+            value={selectedSession}
+            onChange={(e) => setSelectedSession(e.target.value)}
+            className="border border-gray-300 rounded px-3 py-1 text-sm focus:outline-none focus:ring focus:ring-green-300"
+          >
+            {filteredSessions.map(({ sessionId, pushname, phoneNumber }) => (
+              <option key={sessionId} value={sessionId}>
+                {pushname} ({phoneNumber})
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+    </nav>
+  );
+};
+
+export default Navbar;
