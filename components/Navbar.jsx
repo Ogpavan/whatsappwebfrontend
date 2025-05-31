@@ -1,6 +1,9 @@
 import React from "react";
+import { useSession } from "../context/SessionContext";
 
-const Navbar = ({ sessions = [], selectedSession, setSelectedSession }) => {
+const Navbar = ({ sessions = [] }) => {
+  const { selectedSession, setSelectedSession } = useSession();
+
   const filteredSessions = sessions.filter(
     (s) => s.pushname && s.phoneNumber
   );
@@ -8,7 +11,7 @@ const Navbar = ({ sessions = [], selectedSession, setSelectedSession }) => {
   const active = filteredSessions.find((s) => s.sessionId === selectedSession);
 
   return (
-    <nav className="flex items-center justify-between bg-white border-b px-4 py-3 shadow-sm">
+    <nav className=" fixed  w-full z-50 top-0  flex items-center justify-between bg-white border-b px-4 py-3 shadow-sm">
       <h1 className="text-xl font-semibold text-gray-800">
         WhatsApp Multi Sender
       </h1>

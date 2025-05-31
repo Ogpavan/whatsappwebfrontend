@@ -12,7 +12,7 @@ const Sidebar = () => {
   ];
 
   return (
-    <div className="w-64 bg-white border-r p-4">
+    <div className=" fixed h-svh w-64 bg-white border-r p-4">
       <h2 className="text-xl font-bold mb-6">WhatsApp Sender</h2>
       <nav className="space-y-4">
         {links.map(({ path, label }) => (

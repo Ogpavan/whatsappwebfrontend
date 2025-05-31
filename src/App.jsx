@@ -33,25 +33,31 @@ function App() {
 
   return (
     <Router>
-      <div className="flex h-screen flex-col">
-        <Navbar
-          sessions={availableSessions}
-          selectedSession={selectedSession}
-          setSelectedSession={setSelectedSession}
-        />
+     <div className="flex flex-col h-screen">
+  {/* Navbar at top */}
+  <Navbar
+    sessions={availableSessions}
+    selectedSession={selectedSession}
+    setSelectedSession={setSelectedSession}
+  />
 
-        <div className="flex flex-1">
-          <Sidebar />
-          <div className="flex-1 overflow-y-auto bg-gray-50 p-4">
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/send" element={<SendMessage />} />
-              <Route path="/bulk" element={<BulkMessage />} />
-              <Route path="/api" element={<PublicApi />} />
-            </Routes>
-          </div>
-        </div>
-      </div>
+  {/* Main content below navbar */}
+  <div className="flex flex-1 overflow-hidden">
+    {/* Sidebar on the left */}
+    <Sidebar />
+
+    {/* Main page content on the right */}
+    <div className="flex-1 overflow-y-auto bg-gray-50 p-4 mt-10 ml-64">
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/send" element={<SendMessage />} />
+        <Route path="/bulk" element={<BulkMessage />} />
+        <Route path="/api" element={<PublicApi />} />
+      </Routes>
+    </div>
+  </div>
+</div>
+
     </Router>
   );
 }

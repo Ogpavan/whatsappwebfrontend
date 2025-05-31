@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import axios from "axios";
 import { MessageCircle, Plus, Users, Smartphone, Zap, CheckCircle, Clock, AlertCircle, X, QrCode } from "lucide-react";
 
@@ -8,6 +8,7 @@ const Home = () => {
   const [sessions, setSessions] = useState([]);
   const [showQrModal, setShowQrModal] = useState(false);
   const [error, setError] = useState("");
+  const prevSessionsRef = useRef([]);
 
   const fetchSessions = async () => {
     try {
@@ -95,52 +96,54 @@ const Home = () => {
   };
 
   useEffect(() => {
+    // Find if a new session is connected (with a valid phone number)
     const connected = sessions.find(
-      (s) => /^\d{12}$/.test(s.phoneNumber) // check for exact 10 digits
+      (s) => /^\d{12}$/.test(s.phoneNumber)
     );
 
-    if (connected && showQrModal) {
+    // Check if a new session was added
+    const prevSessions = prevSessionsRef.current;
+    const prevConnected = prevSessions.find(
+      (s) => /^\d{12}$/.test(s.phoneNumber)
+    );
+
+    if (showQrModal && connected && !prevConnected) {
+      // Only close if a new connection appeared
       const timer = setTimeout(() => {
         setShowQrModal(false);
-      }, 0); // delay for user to notice connection
+      }, 1500); // 1.5s delay so user can see the modal close
 
       return () => clearTimeout(timer);
     }
+
+    // Update previous sessions ref
+    prevSessionsRef.current = sessions;
   }, [sessions, showQrModal]);
 
 
 
-
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className=" bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Header */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 mb-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="p-3 bg-green-100 rounded-xl">
-                <MessageCircle className="w-8 h-8 text-green-600" />
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">WhatsApp Business Hub</h1>
-                <p className="text-gray-600 mt-1">Manage your WhatsApp sessions efficiently</p>
-              </div>
-            </div>
-            <div className="text-right">
-              <div className="text-2xl font-bold text-gray-900">{sessions.length}</div>
-              <div className="text-sm text-gray-500">Active Sessions</div>
-            </div>
-          </div>
+        
+         
+          
+              
+              
+            
+            
+         
           {error && (
             <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
               <p className="text-red-700 text-sm">{error}</p>
             </div>
           )}
-        </div>
+       
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="bg-white rounded-xl shadow-[0px_2px_3px_-1px_rgba(0,0,0,0.1),0px_1px_0px_0px_rgba(25,28,33,0.02),0px_0px_0px_1px_rgba(25,28,33,0.08)]   p-6">
             <div className="flex items-center justify-between">
               <div className="p-2 bg-green-100 rounded-lg">
                 <Users className="w-5 h-5 text-green-600" />
@@ -151,7 +154,7 @@ const Home = () => {
             <p className="text-gray-500 text-sm">Connected devices</p>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="bg-white rounded-xl shadow-[0px_2px_3px_-1px_rgba(0,0,0,0.1),0px_1px_0px_0px_rgba(25,28,33,0.02),0px_0px_0px_1px_rgba(25,28,33,0.08)]   p-6">
             <div className="flex items-center justify-between">
               <div className="p-2 bg-blue-100 rounded-lg">
                 <CheckCircle className="w-5 h-5 text-blue-600" />
@@ -162,7 +165,7 @@ const Home = () => {
             <p className="text-gray-500 text-sm">Ready to receive</p>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="bg-white rounded-xl shadow-[0px_2px_3px_-1px_rgba(0,0,0,0.1),0px_1px_0px_0px_rgba(25,28,33,0.02),0px_0px_0px_1px_rgba(25,28,33,0.08)]   p-6">
             <div className="flex items-center justify-between">
               <div className="p-2 bg-yellow-100 rounded-lg">
                 <Clock className="w-5 h-5 text-yellow-600" />
@@ -173,7 +176,7 @@ const Home = () => {
             <p className="text-gray-500 text-sm">Inactive sessions</p>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="bg-white rounded-xl shadow-[0px_2px_3px_-1px_rgba(0,0,0,0.1),0px_1px_0px_0px_rgba(25,28,33,0.02),0px_0px_0px_1px_rgba(25,28,33,0.08)]   p-6">
             <div className="flex items-center justify-between">
               <div className="p-2 bg-purple-100 rounded-lg">
                 <Zap className="w-5 h-5 text-purple-600" />
@@ -191,7 +194,7 @@ const Home = () => {
 
           {/* Active Sessions Panel */}
           <div className="lg:col-span-2">
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+            <div className="bg-white rounded-2xl shadow-[0px_2px_3px_-1px_rgba(0,0,0,0.1),0px_1px_0px_0px_rgba(25,28,33,0.02),0px_0px_0px_1px_rgba(25,28,33,0.08)]   p-6">
               <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
                 <Users className="w-5 h-5 mr-2 text-blue-600" />
                 Active Sessions ({sessions.length})
@@ -202,7 +205,7 @@ const Home = () => {
                   {sessions.map((session, index) => (
                     <div
                       key={session.sessionId}
-                      className="p-4 border border-gray-200 rounded-xl hover:border-gray-300 transition-colors duration-200"
+                      className="p-4   rounded-xl hover:border-gray-300 transition-colors duration-200"
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-4">
@@ -252,7 +255,7 @@ const Home = () => {
             </div>
           </div>
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+            <div className="bg-white rounded-2xl shadow-[0px_2px_3px_-1px_rgba(0,0,0,0.1),0px_1px_0px_0px_rgba(25,28,33,0.02),0px_0px_0px_1px_rgba(25,28,33,0.08)]   p-6">
               <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
                 <Plus className="w-5 h-5 mr-2 text-green-600" />
                 Create New Session
@@ -276,7 +279,7 @@ const Home = () => {
                 )}
               </button>
 
-              <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+              <div className="bg-gray-50 rounded-xl p-4  ">
                 <h3 className="text-gray-900 font-medium mb-3">How to connect:</h3>
                 <ol className="text-gray-600 text-sm space-y-2">
                   <li className="flex items-start">
