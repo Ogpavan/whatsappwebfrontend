@@ -7,6 +7,7 @@ const Sidebar = () => {
   const links = [
     { path: "/", label: "Home" },
     { path: "/send", label: "Send Message" },
+    { path: "/receive", label: "Receive Message" },
     { path: "/bulk", label: "Bulk Message" },
     { path: "/api", label: "Public API" },
   ];
