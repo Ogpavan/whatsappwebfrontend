@@ -26,7 +26,7 @@ const Home = () => {
   const fetchSessions = async () => {
     if (!user || !user.uid) return; // Prevent request if user is not ready
     try {
-      const res = await axios.get("http://localhost:5000/sessions", {
+      const res = await axios.get(`${import.meta.env.VITE_API_URL}/sessions`, {
         params: { userId: user.uid },
       });
       setSessions(res.data.sessions || []);
@@ -53,7 +53,7 @@ const Home = () => {
     setError("");
 
     try {
-      const res = await axios.post("http://localhost:5000/create-session", {
+      const res = await axios.post(`${import.meta.env.VITE_API_URL}/create-session`, {
         userId: user.uid, // Pass userId here
       });
       if (res.data.qr) {
@@ -74,7 +74,7 @@ const Home = () => {
   const deleteSession = async (sessionId) => {
     if (window.confirm("Are you sure you want to disconnect this session?")) {
       try {
-        await axios.post("http://localhost:5000/logout-and-delete", {
+        await axios.post(`${import.meta.env.VITE_API_URL}/logout-and-delete`, {
           sessionId: sessionId,
         });
         await fetchSessions();

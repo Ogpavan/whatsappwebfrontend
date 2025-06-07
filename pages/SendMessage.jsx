@@ -23,7 +23,7 @@ const SendMessage = () => {
 
   const fetchSessions = async () => {
     try {
-      const res = await fetch("http://localhost:5000/sessions");
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/sessions`);
       const data = await res.json();
       const validSessions = data.sessions || [];
       setAvailableSessions(validSessions);
@@ -62,7 +62,7 @@ const SendMessage = () => {
     if (media) formData.append("media", media);
 
     try {
-      await fetch("http://localhost:5000/send", {
+      await fetch(`${import.meta.env.VITE_API_URL}/send`, {
         method: "POST",
         body: formData,
       });

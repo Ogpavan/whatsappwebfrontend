@@ -52,11 +52,16 @@ const BulkMessage = () => {
       const formData = new FormData();
       formData.append("sessionId", selectedSession);
       formData.append("number", row.number);
-      formData.append("message", message || row.message || "");
-      if (media) formData.append("media", media);
+
+      // Replace all {header} placeholders with actual row values
+      let msgTemplate = message || row.message || "";
+      msgTemplate = msgTemplate.replace(/{(\w+)}/g, (_, key) => row[key] || "");
+
+      formData.append("message", msgTemplate);
+      if (media) formData.append("file", media); // Use "file" for media
 
       try {
-        await axios.post("http://localhost:5000/send", formData);
+        await axios.post(`${import.meta.env.VITE_API_URL}/send`, formData);
         updatedStatus[index] = "✅ Sent";
       } catch (err) {
         updatedStatus[index] = "❌ Failed";

@@ -16,7 +16,7 @@ export const SessionProvider = ({ children }) => {
     const fetchSessions = async () => {
       if (!user || !user.uid) return;
       try {
-        const res = await axios.get("http://localhost:5000/sessions", {
+        const res = await axios.get(`${import.meta.env.VITE_API_URL}/sessions`, {
           params: { userId: user.uid },
         });
         const data = res.data;
