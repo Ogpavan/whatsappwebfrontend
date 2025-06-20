@@ -1,6 +1,7 @@
 import React from "react";
 import { useSession } from "../context/SessionContext";
 import { useAuth } from "../context/AuthContext";
+import Swal from "sweetalert2";
 
 const Navbar = ({ sessions = [], selectedSession, setSelectedSession }) => {
   const { user, signOut } = useAuth();
@@ -9,11 +10,26 @@ const Navbar = ({ sessions = [], selectedSession, setSelectedSession }) => {
 
   const active = filteredSessions.find((s) => s.sessionId === selectedSession);
 
+  // Add a confirm dialog before logout
+  const handleLogout = async () => {
+    const result = await Swal.fire({
+      title: "Are you sure?",
+      text: "You will be logged out of your account.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#3085d6",
+      confirmButtonText: "Yes, logout",
+      cancelButtonText: "Cancel",
+    });
+    if (result.isConfirmed) {
+      signOut();
+    }
+  };
+
   return (
     <nav className="fixed w-full z-50 top-0 flex items-center justify-between bg-white border-b px-4 py-3 shadow-sm">
-      <h1 className="text-xl font-semibold text-gray-800">
-        WhatsApp Multi Sender
-      </h1>
+      <h1 className="text-xl font-semibold text-gray-800">MSGen</h1>
 
       <div className="flex items-center space-x-4">
         {filteredSessions.length > 0 && active && (
@@ -54,9 +70,11 @@ const Navbar = ({ sessions = [], selectedSession, setSelectedSession }) => {
                 {user.email?.charAt(0).toUpperCase() || "U"}
               </div>
             )}
-            <span className="text-sm text-gray-700">{user.email}</span>
+            <span className="text-sm text-gray-700">
+              {user.displayName || user.email}
+            </span>
             <button
-              onClick={signOut}
+              onClick={handleLogout}
               className="ml-2 px-3 py-1 rounded bg-red-500 text-white text-xs hover:bg-red-600 transition"
             >
               Logout

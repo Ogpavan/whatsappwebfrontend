@@ -1,14 +1,16 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import * as XLSX from "xlsx";
 import axios from "axios";
 import { useSession } from "../context/SessionContext";
+import { FiPaperclip } from "react-icons/fi";
+import { FaBold, FaPaperPlane } from "react-icons/fa";
 
 function formatMessage(msg) {
   if (!msg) return "";
   msg = msg.replace(/</g, "&lt;").replace(/>/g, "&gt;");
   msg = msg.replace(/\*(.*?)\*/g, "<b>$1</b>");
   msg = msg.replace(/_(.*?)_/g, "<i>$1</i>");
-  msg = msg.replace(/\n/g, "<br/>");
+  msg = msg.replace(/ /g, "<br/>");
   return msg;
 }
 
@@ -19,6 +21,8 @@ const BulkMessage = () => {
   const [currentIdx, setCurrentIdx] = useState(0);
   const [message, setMessage] = useState("");
   const [media, setMedia] = useState(null);
+  const [showPreview, setShowPreview] = useState(false);
+  const [agree, setAgree] = useState(false);
 
   const { selectedSession } = useSession();
 
@@ -61,6 +65,7 @@ const BulkMessage = () => {
       if (media) formData.append("file", media); // Use "file" for media
 
       try {
+        console.log("Sending message to:", row.number);
         await axios.post(`${import.meta.env.VITE_API_URL}/send`, formData);
         updatedStatus[index] = "✅ Sent";
       } catch (err) {
@@ -101,97 +106,301 @@ const BulkMessage = () => {
   // Preview data for the current recipient
   const previewRow = rows[currentIdx] || {};
 
+  // Add for copy-paste bulk input
+  const [bulkInput, setBulkInput] = useState("");
+  const [inputMode, setInputMode] = useState("paste"); // "paste" or "file"
+
+  const handleBulkInput = () => {
+    const lines = bulkInput
+      .split(" ")
+      .map((line) => line.trim())
+      .filter(Boolean);
+    const parsedRows = lines.map((line) => {
+      const [number, ...msgParts] = line.split(",");
+      return {
+        number: number.trim(),
+        message: msgParts.join(",").trim() || "",
+      };
+    });
+    setRows(parsedRows);
+    setStatusMap({});
+    setCurrentIdx(0);
+  };
+
+  // Drag and drop state
+  const [dragActive, setDragActive] = useState(false);
+  const [dragActiveFile, setDragActiveFile] = useState(false);
+  const fileInputRef = useRef();
+  const fileUploadRef = useRef();
+
+  // Handle drag and drop for media
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(true);
+  };
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+  };
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      setMedia(e.dataTransfer.files[0]);
+    }
+  };
+  const handleFileChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      setMedia(e.target.files[0]);
+    }
+  };
+
+  // Handle drag and drop for file upload
+  const handleDragOverFile = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActiveFile(true);
+  };
+  const handleDragLeaveFile = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActiveFile(false);
+  };
+  const handleDropFile = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActiveFile(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFileUpload({ target: { files: e.dataTransfer.files } });
+    }
+  };
+  const handleFileInputClick = () => {
+    fileUploadRef.current.click();
+  };
+
+  // Show preview popup before sending
+  const handleSendClick = () => {
+    setShowPreview(true);
+  };
+
+  const confirmSend = async () => {
+    setShowPreview(false);
+    await sendBulkMessages();
+  };
+
   return (
     <div className="flex h-full bg-white overflow-hidden">
       {/* Controls Section */}
       <div className="w-1/2 flex flex-col justify-center items-center border-r p-8">
         <div className="w-full max-w-md space-y-6">
+          {/* Step 1: Choose Input Method */}
+          <div className="flex gap-4 mb-2">
+            <button
+              className={`px-4 py-2 rounded ${
+                inputMode === "paste"
+                  ? "bg-green-500 text-white"
+                  : "bg-gray-200"
+              }`}
+              onClick={() => setInputMode("paste")}
+            >
+              Paste Numbers
+            </button>
+            <button
+              className={`px-4 py-2 rounded ${
+                inputMode === "file" ? "bg-green-500 text-white" : "bg-gray-200"
+              }`}
+              onClick={() => setInputMode("file")}
+            >
+              Upload CSV File
+            </button>
+          </div>
+          {/* Step 2: Enter Recipients */}
+          {inputMode === "paste" ? (
+            <div>
+              <label className="block mb-1 font-medium">
+                Step 1: Paste Numbers & Messages
+              </label>
+              <p className="text-xs text-gray-500 mb-2">
+                <b>Tip:</b> Paste numbers with or without a message, one per
+                line.
+              </p>
+              <textarea
+                placeholder="One per line: 919876543210,Hello! Or just: 919876543210"
+                value={bulkInput}
+                onChange={(e) => setBulkInput(e.target.value)}
+                className="w-full border px-3 py-2 rounded"
+                rows={3}
+              />
+              <div className="flex justify-end">
+                <button
+                  className="px-4 py-1  text-md  bg-green-500 text-white rounded"
+                  onClick={handleBulkInput}
+                >
+                  Add in Queue
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <label className="block mb-1 font-medium">
+                Step 1: Upload Recipients File
+              </label>
+              <div
+                className={`w-full border-2 border-dashed rounded p-4 text-center cursor-pointer transition ${
+                  dragActiveFile
+                    ? "border-green-500 bg-green-50"
+                    : "border-gray-300"
+                }`}
+                onDragOver={handleDragOverFile}
+                onDragLeave={handleDragLeaveFile}
+                onDrop={handleDropFile}
+                onClick={handleFileInputClick}
+              >
+                <input
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  onChange={handleFileUpload}
+                  ref={fileUploadRef}
+                  className="hidden"
+                />
+                <span className="text-gray-500">
+                  Drag & drop your Excel/CSV file here, or{" "}
+                  <span className="text-green-600 underline">
+                    click to select
+                  </span>
+                </span>
+              </div>
+              <div className="text-xs text-gray-500 mt-1">
+                <p>
+                  <p>
+                    <strong>Disclaimer:</strong> First column must be the{" "}
+                    <code>&#123;number&#125;</code>. Use{" "}
+                    <code>&#123;column_name&#125;</code> to insert dynamic
+                    values.
+                  </p>
+                </p>
+              </div>
+            </div>
+          )}
+          {/* Step 3: Preview Recipients */}
+          {/* {rows.length > 0 && (
+            <div>
+              <label className="block mb-1 font-medium">
+                Step 2: Preview Recipients
+              </label>
+              <ul className="border rounded p-2 max-h-24 overflow-y-auto text-sm bg-gray-50">
+                {rows.map((row, idx) => (
+                  <li key={idx} className="flex gap-2">
+                    <span className="font-mono">{row.number}</span>
+                    {row.message && <span>- {row.message}</span>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )} */}
+          {/* Step 4: Compose Message */}
           <div>
             <label className="block mb-1 font-medium">
-              Upload Recipients File
+              Step 3: Write Your Message
             </label>
-            <input
-              type="file"
-              accept=".xlsx,.xls,.csv"
-              onChange={handleFileUpload}
-              className="w-full"
-            />
-            <div className="text-xs text-gray-500 mt-1">
-              Upload a file with columns: <b>number</b>, <b>message</b>{" "}
-              (optional)
+            <div className="flex items-center gap-2 mt-2">
+              <div className="flex-1 flex items-center bg-white rounded-full px-3 py-2 border shadow">
+                {/* Bold Button */}
+                <button
+                  type="button"
+                  className="mr-2 text-gray-500 hover:text-green-600"
+                  title="Bold"
+                  onClick={() => handleFormat("bold")}
+                >
+                  <FaBold />
+                </button>
+                {/* Message Input */}
+                <input
+                  id="bulk-msg-input"
+                  type="text"
+                  placeholder="Type a message to send to all (or leave blank to use per-row message)..."
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  className="flex-1 bg-transparent outline-none text-gray-700"
+                />
+                {/* Drag and Drop Attachment */}
+                <div
+                  className={`relative flex items-center ml-2 mb-0 cursor-pointer transition ${
+                    dragActive ? "bg-green-50 border-green-400" : ""
+                  }`}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  onClick={() => fileInputRef.current.click()}
+                  style={{
+                    minWidth: 36,
+                    minHeight: 36,
+                    borderRadius: "9999px",
+                  }}
+                  title="Attach file (drag & drop or click)"
+                >
+                  <FiPaperclip className="text-gray-500 text-xl hover:text-green-600 transition" />
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    className="hidden"
+                    accept="*"
+                  />
+                  {dragActive && (
+                    <div className="absolute inset-0 bg-green-100 bg-opacity-50 rounded-full border-2 border-green-400 pointer-events-none" />
+                  )}
+                </div>
+              </div>
+              {/* Send Button */}
+              <button
+                onClick={handleSendClick}
+                disabled={sending || rows.length === 0 || !selectedSession}
+                className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center shadow-lg hover:bg-green-600 transition disabled:opacity-50"
+                title="Send"
+              >
+                <FaPaperPlane className="text-white text-lg" />
+              </button>
             </div>
-          </div>
-          <div>
-            <label className="block mb-1 font-medium">Message</label>
-            <textarea
-              id="bulk-msg-input"
-              placeholder="Type a message to send to all (or leave blank to use per-row message)..."
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              className="w-full border px-3 py-2 rounded"
-              rows="4"
-            />
-          </div>
-          <div className="flex gap-3">
-            <button
-              type="button"
-              className="px-4 py-2 rounded bg-gray-100 border font-bold"
-              onClick={() => handleFormat("bold")}
-            >
-              <span className="font-bold">B</span> Bold
-            </button>
-            <button
-              type="button"
-              className="px-4 py-2 rounded bg-gray-100 border italic"
-              onClick={() => handleFormat("italic")}
-            >
-              <span className="italic">I</span> Italic
-            </button>
-          </div>
-          <div>
-            <label className="block mb-1 font-medium">Attachment</label>
-            <input
-              type="file"
-              onChange={(e) => setMedia(e.target.files[0])}
-              className="w-full"
-              accept="*"
-            />
             {media && (
-              <div className="text-sm text-green-700 mt-2">
+              <div className="text-xs text-green-700 mb-1 text-right">
                 File attached: {media.name}
               </div>
             )}
+            <div className="text-xs text-gray-500 mt-1">
+              <b>Tip:</b> Drag and drop a file onto the paperclip, or click it
+              to choose a file.
+            </div>
           </div>
-          <button
-            onClick={sendBulkMessages}
-            disabled={sending || rows.length === 0 || !selectedSession}
-            className="w-full py-2 rounded bg-green-600 text-white font-bold disabled:opacity-50"
-          >
-            {sending
-              ? `Sending (${currentIdx + 1}/${rows.length})...`
-              : "Send Bulk Messages"}
-          </button>
-          <div>
-            <h2 className="font-semibold mb-2">Bulk Send Status</h2>
-            <ul className="space-y-1 max-h-40 overflow-y-auto text-sm">
-              {rows.map((row, idx) => (
-                <li key={idx} className="flex items-center gap-2">
-                  <span className="font-mono">{row.number}</span>
-                  <span>
-                    {statusMap[idx] === "✅ Sent" && (
-                      <span className="text-green-600">{statusMap[idx]}</span>
-                    )}
-                    {statusMap[idx] === "❌ Failed" && (
-                      <span className="text-red-600">{statusMap[idx]}</span>
-                    )}
-                    {!statusMap[idx] && (
-                      <span className="text-gray-400">Pending</span>
-                    )}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
+          {/* Step 5: Status */}
+          {rows.length > 0 && (
+            <div>
+              <label className="block mb-1 font-medium">
+                Step 4: Sending Status
+              </label>
+              <ul className="space-y-1 max-h-40 overflow-y-auto text-sm border rounded p-2 bg-gray-50">
+                {rows.map((row, idx) => (
+                  <li key={idx} className="flex items-center gap-2">
+                    <span className="font-mono">{row.number}</span>
+                    <span>
+                      {statusMap[idx] === "✅ Sent" && (
+                        <span className="text-green-600">{statusMap[idx]}</span>
+                      )}
+                      {statusMap[idx] === "❌ Failed" && (
+                        <span className="text-red-600">{statusMap[idx]}</span>
+                      )}
+                      {!statusMap[idx] && (
+                        <span className="text-gray-400">Pending</span>
+                      )}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       </div>
       {/* Phone Preview Section */}
@@ -319,6 +528,70 @@ const BulkMessage = () => {
           </div>
         </div>
       </div>
+
+      {/* Preview Popup */}
+      {showPreview && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg p-6 max-w-lg w-full">
+            <h3 className="text-lg font-bold mb-2 text-green-700">
+              Preview Bulk Send
+            </h3>
+            <div className="max-h-48 overflow-y-auto border rounded p-2 mb-3 bg-gray-50 text-sm">
+              <div className="mb-2 text-gray-700 font-semibold">
+                <span>First 10 Recipients:</span>
+              </div>
+              <ul>
+                {rows.slice(0, 10).map((row, idx) => (
+                  <li key={idx} className="mb-1">
+                    <span className="font-mono">{row.number}</span>
+                    {row.message && <span> - {row.message}</span>}
+                  </li>
+                ))}
+                {rows.length > 10 && (
+                  <li className="text-xs text-gray-400">
+                    ...and {rows.length - 10} more
+                  </li>
+                )}
+              </ul>
+            </div>
+            <div className="mb-3 text-yellow-700 bg-yellow-50 border border-yellow-200 rounded p-2 text-xs">
+              <b>Important:</b> Sending too many messages at once may cause your
+              WhatsApp number to be blocked. Try sending to a small group first.
+            </div>
+            <div className="flex items-center mb-4">
+              <input
+                type="checkbox"
+                id="agree"
+                checked={agree}
+                onChange={(e) => setAgree(e.target.checked)}
+                className="mr-2"
+              />
+              <label htmlFor="agree" className="text-sm text-gray-700">
+                I agree to send these messages and understand the risks.
+              </label>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                className="px-4 py-1 rounded bg-gray-200"
+                onClick={() => setShowPreview(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className={`px-4 py-1 rounded text-white ${
+                  agree
+                    ? "bg-green-600 hover:bg-green-700"
+                    : "bg-green-300 cursor-not-allowed"
+                }`}
+                disabled={!agree}
+                onClick={confirmSend}
+              >
+                Send Now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

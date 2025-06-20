@@ -1,4 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
+import { MdSend } from "react-icons/md";
+import axios from "axios";
 import { useSession } from "../context/SessionContext";
 import { db } from "../src/firebase";
 import {
@@ -16,7 +18,7 @@ import { useAuth } from "../context/AuthContext";
 function formatTime(ts) {
   if (!ts) return "";
   const d = new Date(ts * 1000);
-  return d.toLocaleTimeString();
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
 const contactCache = {};
@@ -25,9 +27,9 @@ async function getContactInfo(number, sessionId) {
   if (contactCache[number]) return contactCache[number];
   try {
     const res = await fetch(
-      `${import.meta.env.VITE_API_URL}/contact/${encodeURIComponent(number)}?sessionId=${encodeURIComponent(
-        sessionId
-      )}`
+      `${import.meta.env.VITE_API_URL}/contact/${encodeURIComponent(
+        number
+      )}?sessionId=${encodeURIComponent(sessionId)}`
     );
     const data = await res.json();
     contactCache[number] = {
@@ -46,16 +48,18 @@ async function getContactInfo(number, sessionId) {
 }
 
 function ReceiveMessage() {
-  const { selectedSession } = useSession();
-  const { user } = useAuth();
+  const { selectedSession, phoneNumber } = useSession(); // <-- get phoneNumber here
+  const { user: authUser } = useAuth();
   const [messages, setMessages] = useState([]);
   const [selectedContact, setSelectedContact] = useState(null);
   const [input, setInput] = useState("");
   const [contactInfos, setContactInfos] = useState({});
+  const [chats, setChats] = useState([]);
+  const [loading, setLoading] = useState(false);
   const wsRef = useRef(null);
   const messagesEndRef = useRef(null);
 
-  const myNumber = user?.phoneNumber || "YOUR_WHATSAPP_NUMBER@c.us";
+  const myNumber = phoneNumber + "@c.us"; // Use the session's phone number
 
   // Collect unique contacts from messages
   const contactSet = new Set();
@@ -68,15 +72,19 @@ function ReceiveMessage() {
     }
   });
   const contacts = Array.from(contactSet).map((contact) => {
-    const info = contactInfos[contact] || { name: contact, profilePic: `https://ui-avatars.com/api/?name=${encodeURIComponent(contact)}` };
+    const info = contactInfos[contact] || {
+      name: contact,
+      profilePic: `https://ui-avatars.com/api/?name=${encodeURIComponent(
+        contact
+      )}`,
+    };
     return {
       from: contact,
       name: info.name,
       profilePic: info.profilePic,
       lastMsg: messages
         .filter(
-          (msg) =>
-            msg.from === contact && (!msg.to || msg.to === myNumber)
+          (msg) => msg.from === contact && (!msg.to || msg.to === myNumber)
         )
         .slice(-1)[0],
     };
@@ -90,9 +98,26 @@ function ReceiveMessage() {
     );
     wsRef.current = ws;
 
-    ws.onmessage = (event) => {
+    ws.onmessage = async (event) => {
       const msg = JSON.parse(event.data);
-      console.log("Received message:", msg); // <-- Add this
+      console.log("Received message:", msg);
+
+      // Save to Firestore
+      if (user && selectedSession) {
+        await addDoc(
+          collection(
+            db,
+            "users",
+            user.uid,
+            "sessions",
+            selectedSession,
+            "messages"
+          ),
+          msg
+        );
+      }
+
+      // Update UI
       setMessages((prev) => [...prev, msg]);
     };
 
@@ -129,24 +154,30 @@ function ReceiveMessage() {
     // eslint-disable-next-line
   }, [Array.from(contactSet).join(","), selectedSession]);
 
-  // Filter messages for selected contact
+  // Show both sent and received messages for the selected chat
   const chatMessages = messages.filter(
     (msg) =>
-      // Received: from selectedContact, and (to is me OR to is missing)
-      (msg.from === selectedContact && (!msg.to || msg.to === myNumber)) ||
-      // Sent: from me to selectedContact
-      (msg.from === myNumber && msg.to === selectedContact)
+      (msg.from === selectedContact && msg.to === myNumber) || // received
+      (msg.from === myNumber && msg.to === selectedContact) // sent
   );
+
+  useEffect(() => {
+    console.log("Selected Contact:", selectedContact);
+    console.log("My Number:", myNumber);
+    console.log("User:", chatMessages);
+    console.log("Selected Session:", selectedSession);
+    console.log("All Messages:", messages);
+  }, [selectedContact, myNumber, selectedSession, messages]);
 
   // Fetch messages from Firestore on session/user change
   useEffect(() => {
-    if (!selectedSession || !user) return;
+    if (!selectedSession || !authUser) return;
     const fetchMessages = async () => {
       const q = query(
         collection(
           db,
           "users",
-          user.uid,
+          authUser.uid,
           "sessions",
           selectedSession,
           "messages"
@@ -157,53 +188,33 @@ function ReceiveMessage() {
       setMessages(querySnapshot.docs.map((doc) => doc.data()));
     };
     fetchMessages();
-  }, [selectedSession, user]);
+  }, [selectedSession, authUser]);
 
+  const getAllChats = async () => {
+    if (!selectedSession) setLoading(true);
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_URL}/get-all-chats`,
+        { params: { sessionId: selectedSession } }
+      );
+      setChats(res.data.chats || []);
+      console.log(res.data);
+    } catch (err) {
+      console.error("Failed to fetch chats:", err);
+    }
+    setLoading(false);
+  };
   // Auto-scroll to bottom when chatMessages change
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
-  }, [chatMessages]);
-
-  // Clear chat handler
-  const handleClearChat = async () => {
-    if (!selectedSession || !user || !selectedContact) return;
-    // Query all messages for this contact
-    const q = query(
-      collection(
-        db,
-        "users",
-        user.uid,
-        "sessions",
-        selectedSession,
-        "messages"
-      ),
-      where("from", "==", selectedContact)
-    );
-    const querySnapshot = await getDocs(q);
-    // Delete each message
-    const deletions = querySnapshot.docs.map((docSnap) =>
-      deleteDoc(
-        doc(
-          db,
-          "users",
-          user.uid,
-          "sessions",
-          selectedSession,
-          "messages",
-          docSnap.id
-        )
-      )
-    );
-    await Promise.all(deletions);
-    // Remove from UI
-    setMessages((prev) => prev.filter((msg) => msg.from !== selectedContact));
-  };
+  }, [selectedContact, chatMessages]);
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (!input.trim() || !selectedSession || !selectedContact || !user) return;
+    if (!input.trim() || !selectedSession || !selectedContact || !authUser)
+      return;
 
     const newMsg = {
       from: myNumber,
@@ -225,7 +236,7 @@ function ReceiveMessage() {
         }),
       });
     } catch (err) {
-      // Optionally handle API error
+      console.error("Failed to send message:", err);
     }
 
     // 2. Save to Firestore
@@ -233,7 +244,7 @@ function ReceiveMessage() {
       collection(
         db,
         "users",
-        user.uid,
+        authUser.uid,
         "sessions",
         selectedSession,
         "messages"
@@ -241,39 +252,77 @@ function ReceiveMessage() {
       newMsg
     );
 
-    // 3. Instantly update UI
+    // 3. Instantly update UI -- REMOVE THIS LINE!
     setMessages((prev) => [...prev, newMsg]);
     setInput("");
   };
 
+  const fetchMessages = async (chatId) => {
+    if (!selectedSession || !chatId) {
+      // alert("Please select a chat first.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      console.log("Fetching messages...");
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_URL}/get-messages`,
+        {
+          params: { sessionId: selectedSession, chatId, limit: 50 },
+        }
+      );
+      console.log("Fetched messages:", res.data.messages);
+      setMessages(res.data.messages || []); // Update state with fetched messages
+    } catch (err) {
+      console.error("Failed to fetch messages:", err);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    getAllChats();
+  }, [selectedSession]);
+
   return (
-    <div className="flex h-full rounded bg-white overflow-hidden">
+    <div className="flex h-full bg-gray-100">
       {/* Sidebar */}
-      <div className="w-64 bg-gray-100 border-r flex flex-col">
-        <div className="p-4 font-bold text-md border-b bg-white">Chats</div>
-        <ul className="flex-1 overflow-y-auto">
-          {contacts.map((contact) => (
+      <div className="w-64 shadow bg-white border-r flex flex-col">
+        <div className="p-4 font-bold text-lg border-b bg-green-600  text-white">
+          Chats
+        </div>
+        <ul className="flex-1 overflow-y-auto overflow-x-hidden">
+          {chats.map((chat) => (
             <li
-              key={contact.from}
+              key={chat.id._serialized}
               className={`cursor-pointer px-4 py-3 border-b hover:bg-gray-200 ${
-                selectedContact === contact.from ? "bg-white font-semibold" : ""
+                selectedContact === chat.id._serialized
+                  ? "bg-gray-100 font-semibold"
+                  : ""
               }`}
-              onClick={() => setSelectedContact(contact.from)}
+              onClick={() => {
+                setSelectedContact(chat.id._serialized);
+                fetchMessages(chat.id._serialized); // Fetch messages for the selected chat
+              }}
             >
               <div className="flex items-center space-x-3">
                 <img
-                  src={contact.profilePic}
-                  alt={contact.name}
-                  className="w-8 h-8 rounded-full object-cover border"
+                  src={
+                    chat.profilePic ||
+                    `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                      chat.name || chat.id.user
+                    )}`
+                  }
+                  alt={chat.name || chat.id.user}
+                  className="w-10 h-10 rounded-full object-cover border"
                 />
+
                 <div>
-                  <div className="truncate font-medium">{contact.name}</div>
+                  <div className="truncate font-medium">
+                    {chat.name || chat.id.user}
+                  </div>
                   <div className="text-xs text-gray-500 truncate">
-                    {contact.lastMsg?.body
-                      ? contact.lastMsg.body.length > 20
-                        ? contact.lastMsg.body.slice(0, 20) + "..."
-                        : contact.lastMsg.body
-                      : contact.lastMsg?.type}
+                    {chat.lastMessage?.body || "No messages yet"}
                   </div>
                 </div>
               </div>
@@ -283,44 +332,59 @@ function ReceiveMessage() {
       </div>
       {/* Chat Area */}
       <div className="flex-1 flex flex-col">
-        <div className="p-4 border-b bg-gray-50 font-semibold flex items-center justify-between">
+        <div className="p-4 border-b bg-green-600 font-semibold flex items-center text-white justify-between">
           <span>{selectedContact || "Select a chat"}</span>
-          {selectedContact && (
-            <button
-              className="text-xs text-red-500 border border-red-300 rounded px-2 py-1 hover:bg-red-50"
-              onClick={handleClearChat}
-            >
-              Clear Chat
-            </button>
-          )}
         </div>
         <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-[#ece5dd]">
           {chatMessages.length === 0 ? (
             <div className="text-gray-400 text-center mt-10">
-              No messages yet.
+              No messages yet
             </div>
           ) : (
-            chatMessages.map((msg, idx) => {
+            chatMessages.map((msg) => {
               const isSent = msg.from === myNumber;
               return (
                 <div
-                  key={idx}
+                  key={msg.id}
                   className={`flex ${isSent ? "justify-end" : "justify-start"}`}
                 >
                   <div
-                    className={`rounded-lg px-4 py-2 max-w-xs shadow
-                      ${isSent
+                    className={`rounded-lg px-4 py-2 max-w-xs shadow ${
+                      isSent
                         ? "bg-[#d9fdd3] text-gray-900 rounded-br-none"
-                        : "bg-white text-gray-900 rounded-bl-none"}
-                    `}
-                    style={{
-                      borderTopLeftRadius: isSent ? 16 : 4,
-                      borderTopRightRadius: isSent ? 4 : 16,
-                      borderBottomLeftRadius: 16,
-                      borderBottomRightRadius: 16,
-                    }}
+                        : "bg-white text-gray-900 rounded-bl-none"
+                    }`}
                   >
-                    <div className="text-sm">{msg.body}</div>
+                    {msg.type === "chat" && (
+                      <div className="text-sm break-all">{msg.body}</div>
+                    )}
+                    {msg.type === "image" && msg.body && (
+                      <img
+                        src={
+                          msg.body.startsWith("http")
+                            ? msg.body
+                            : msg.body.startsWith("/media/")
+                            ? `${import.meta.env.VITE_API_URL}${msg.body}`
+                            : msg.body.length > 100
+                            ? `data:image/jpeg;base64,${msg.body}`
+                            : `${import.meta.env.VITE_API_URL}/media/${
+                                msg.body
+                              }`
+                        }
+                        alt="Image"
+                        className="w-full h-auto rounded-lg"
+                      />
+                    )}
+                    {msg.type === "document" && (
+                      <a
+                        href={msg.body} // Assuming `body` contains the document URL
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-500 underline"
+                      >
+                        {msg.body}
+                      </a>
+                    )}
                     <div className="text-xs text-gray-500 text-right mt-1">
                       {formatTime(msg.timestamp)}
                     </div>
@@ -341,12 +405,13 @@ function ReceiveMessage() {
               onChange={(e) => setInput(e.target.value)}
               disabled={!selectedContact}
             />
+
             <button
               type="submit"
-              className="bg-blue-500 text-white px-4 py-2 rounded-r hover:bg-blue-600 disabled:opacity-50"
+              className="bg-green-500 rounded-full w-10 h-10 flex items-center justify-center ml-2 hover:bg-green-600 disabled:opacity-50 transition"
               disabled={!input.trim() || !selectedContact}
             >
-              Send
+              <MdSend className="text-white text-lg" />
             </button>
           </form>
         </div>

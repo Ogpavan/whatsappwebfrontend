@@ -1,5 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useSession } from "../context/SessionContext";
+import { FiPaperclip } from "react-icons/fi";
+import { FaPaperPlane } from "react-icons/fa";
 
 function formatMessage(msg) {
   if (!msg) return "";
@@ -17,7 +19,11 @@ const SendMessage = () => {
   const [media, setMedia] = useState(null);
   const [sending, setSending] = useState(false);
   const [btnAnim, setBtnAnim] = useState(false);
+  const [contacts, setContacts] = useState([]);
+  const [matchedContacts, setMatchedContacts] = useState([]);
+  const [showDropdown, setShowDropdown] = useState(false);
   const audioRef = useRef(null);
+  const fileInputRef = useRef();
 
   const { selectedSession, setSelectedSession } = useSession();
 
@@ -25,6 +31,7 @@ const SendMessage = () => {
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/sessions`);
       const data = await res.json();
+      console.log("Fetched sessions:", data);
       const validSessions = data.sessions || [];
       setAvailableSessions(validSessions);
       if (!selectedSession && validSessions.length > 0) {
@@ -40,6 +47,36 @@ const SendMessage = () => {
     const interval = setInterval(fetchSessions, 3000);
     return () => clearInterval(interval);
   }, []);
+
+  // Fetch contacts when session changes
+  useEffect(() => {
+    if (!selectedSession) return;
+    fetch(
+      `${import.meta.env.VITE_API_URL}/contacts?sessionId=${selectedSession}`
+    )
+      .then((res) => res.json())
+      .then((data) => setContacts(data.contacts || []));
+  }, [selectedSession]);
+
+  const isValidPhoneNumber = (num) => /^\d{12}$/.test(num.replace("@c.us", "")); // Only 12 digit numbers
+
+  // Match contact as user types
+  useEffect(() => {
+    const search = number.trim().toLowerCase();
+    if (!search) {
+      setMatchedContacts([]);
+      setShowDropdown(false);
+      return;
+    }
+    const matches = contacts.filter(
+      (c) =>
+        isValidPhoneNumber(c.number) &&
+        (c.number.replace("@c.us", "").includes(search) ||
+          (c.name && c.name.toLowerCase().includes(search)))
+    );
+    setMatchedContacts(matches);
+    setShowDropdown(matches.length > 0);
+  }, [number, contacts]);
 
   const send = async () => {
     if (!selectedSession || !number.trim()) {
@@ -86,38 +123,67 @@ const SendMessage = () => {
         <div className="w-full max-w-md space-y-6">
           <div>
             <label className="block mb-1 font-medium">Recipient Number</label>
-            <input
-              type="text"
-              placeholder="Enter phone number with country code"
-              value={number}
-              onChange={(e) => setNumber(e.target.value)}
-              className="w-full border px-3 py-2 rounded"
-            />
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Enter phone number with country code"
+                value={number}
+                onChange={(e) => setNumber(e.target.value)}
+                className="w-full border px-3 py-2 rounded"
+                onFocus={() => setShowDropdown(matchedContacts.length > 0)}
+                onBlur={() => setTimeout(() => setShowDropdown(false), 150)} // delay to allow click
+                autoComplete="off"
+              />
+              {showDropdown && (
+                <div className="absolute z-20 bg-white border w-full mt-1 rounded shadow max-h-48 overflow-y-auto">
+                  {matchedContacts.map((contact, idx) => (
+                    <div
+                      key={contact.number + idx}
+                      className="px-3 py-2 hover:bg-green-100 cursor-pointer flex flex-col"
+                      onClick={() => {
+                        setNumber(contact.number.replace("@c.us", ""));
+                        setShowDropdown(false);
+                      }}
+                    >
+                      <span className="font-semibold">
+                        {contact.name || contact.number.replace("@c.us", "")}
+                      </span>
+                      <span className="text-xs text-gray-600">
+                        {contact.number.replace("@c.us", "")}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
-          <div>
-            <label className="block mb-1 font-medium">Message</label>
-            <textarea
-              id="msg-input"
-              placeholder="Type your message here..."
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              className="w-full border px-3 py-2 rounded"
-              rows="4"
-            />
-          </div>
-          <div>
-            <label className="block mb-1 font-medium">Attachment</label>
-            <input
-              type="file"
-              onChange={(e) => setMedia(e.target.files[0])}
-              className="w-full"
-              accept="*"
-            />
-            {media && (
-              <div className="text-sm text-green-700 mt-2">
-                File attached: {media.name}
-              </div>
-            )}
+          <div className="flex items-center gap-2 mt-4">
+            <div className="flex-1 flex items-center bg-white rounded-md px-3 py-2 border shadow">
+              <textarea
+                placeholder="Type your message here..."
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                className="flex-1 bg-transparent outline-none text-gray-700"
+              />
+              {/* Attachment Button */}
+              <label className="cursor-pointer flex items-center ml-2">
+                <FiPaperclip className="text-gray-500 text-xl hover:text-green-600 transition" />
+                <input
+                  type="file"
+                  onChange={(e) => setMedia(e.target.files[0])}
+                  className="hidden"
+                  accept="*"
+                />
+              </label>
+            </div>
+            {/* Send Button */}
+            {/* <button
+              onClick={send}
+              disabled={sending || !number.trim()}
+              className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center shadow-lg hover:bg-green-600 transition disabled:opacity-50"
+            >
+              <FaPaperPlane className="text-white text-lg" />
+            </button> */}
           </div>
           <button
             onClick={send}
@@ -241,20 +307,43 @@ const SendMessage = () => {
                 )}
               </div>
               {/* WhatsApp Input Bar */}
-              <div className="bg-gray-50 h-16 flex items-center px-3 gap-2 ">
-                <div className="flex-1 bg-white rounded-full px-4 py-2 text-gray-400 text-sm border">
-                  Type a message
+              <div className="bg-gray-50 h-16 flex items-center px-3 gap-2">
+                <div
+                  className="flex-1 flex items-center bg-white rounded-full px-2 py-2 border"
+                  style={{ maxWidth: "90%" }}
+                >
+                  <input
+                    type="text"
+                    placeholder="Type a message"
+                    // value={message}
+                    // onChange={(e) => setMessage(e.target.value)}
+                    className="flex-1 bg-transparent outline-none px-2 text-gray-700"
+                  />
+                  {/* Attachment Button */}
+                  <label className="cursor-pointer flex items-center mr-2">
+                    <FiPaperclip className="text-gray-500 text-xl hover:text-green-600 transition" />
+                    <input
+                      type="file"
+                      // onChange={(e) => setMedia(e.target.files[0])}
+                      className="hidden"
+                      accept="*"
+                    />
+                  </label>
                 </div>
-                <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center shadow-lg">
-                  <svg width="16" height="16" fill="white" viewBox="0 0 24 24">
-                    <path d="M2 21l21-9-21-9v7l15 2-15 2z" />
-                  </svg>
-                </div>
+                {/* Send Button */}
+                {/* <button
+                  onClick={send}
+                  disabled={sending}
+                  className="ml-2 w-10 h-10 bg-green-500   flex items-center justify-center shadow-lg hover:bg-green-600 transition disabled:opacity-50"
+                >
+                  <FaPaperPlane className="text-white text-lg" />
+                </button> */}
               </div>
             </div>
           </div>
         </div>
       </div>
+      {/* WhatsApp-style Message Input Bar */}
     </div>
   );
 };

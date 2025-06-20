@@ -62,7 +62,7 @@ function App() {
     fetchSessions();
     const interval = setInterval(fetchSessions, 3000);
     return () => clearInterval(interval);
-  }, [user]);
+  }, [user, selectedSession, setSessions]);
 
   return (
     <Routes>

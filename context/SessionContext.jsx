@@ -16,10 +16,14 @@ export const SessionProvider = ({ children }) => {
     const fetchSessions = async () => {
       if (!user || !user.uid) return;
       try {
-        const res = await axios.get(`${import.meta.env.VITE_API_URL}/sessions`, {
-          params: { userId: user.uid },
-        });
+        const res = await axios.get(
+          `${import.meta.env.VITE_API_URL}/sessions`,
+          {
+            params: { userId: user.uid },
+          }
+        );
         const data = res.data;
+        console.log("Fetched sessions:", res.data.sessions[0].phoneNumber);
         setSessions(data.sessions || []);
         if (!selectedSession && data.sessions && data.sessions.length > 0) {
           setSelectedSession(data.sessions[0].sessionId);
@@ -31,11 +35,21 @@ export const SessionProvider = ({ children }) => {
     fetchSessions();
     const interval = setInterval(fetchSessions, 3000);
     return () => clearInterval(interval);
-  }, [selectedSession, user]);
+  }, [selectedSession, user, setSessions]);
+
+  // Find the current session object
+  const currentSession = sessions.find((s) => s.sessionId === selectedSession);
+  const phoneNumber = currentSession?.phoneNumber || null;
 
   return (
     <SessionContext.Provider
-      value={{ selectedSession, setSelectedSession, sessions, setSessions }}
+      value={{
+        selectedSession,
+        setSelectedSession,
+        sessions,
+        setSessions,
+        phoneNumber, // <-- add this
+      }}
     >
       {children}
     </SessionContext.Provider>
