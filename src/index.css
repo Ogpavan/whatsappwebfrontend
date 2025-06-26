@@ -1,7 +1,12 @@
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap');
+/* @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap');
 
 
 @theme {
   --font-nunito: 'Nunito', sans-serif;
+} */
+
+.break-all {
+  word-break: break-all;
+  overflow-wrap: break-word;
 }

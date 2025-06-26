@@ -49,16 +49,20 @@ const Home = () => {
 
   const createSession = async () => {
     setLoading(true);
-    setQrCode("");
+    setQrCode(""); // Reset QR code
     setError("");
+    setShowQrModal(true); // Show the modal instantly
 
     try {
-      const res = await axios.post(`${import.meta.env.VITE_API_URL}/create-session`, {
-        userId: user.uid, // Pass userId here
-      });
+      console.log("Creating session...");
+      const res = await axios.post(
+        `${import.meta.env.VITE_API_URL}/create-session`,
+        {
+          userId: user.uid, // Pass userId here
+        }
+      );
       if (res.data.qr) {
-        setQrCode(res.data.qr);
-        setShowQrModal(true);
+        setQrCode(res.data.qr); // Set the QR code once generated
       } else {
         setError("No QR code received from server");
       }
@@ -67,7 +71,7 @@ const Home = () => {
       console.error("Error creating session", err);
       setError("Failed to create session. Please try again.");
     } finally {
-      setLoading(false);
+      setLoading(false); // Stop loading
     }
   };
 
@@ -153,7 +157,7 @@ const Home = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <div className="bg-white rounded-xl shadow-[0px_2px_3px_-1px_rgba(0,0,0,0.1),0px_1px_0px_0px_rgba(25,28,33,0.02),0px_0px_0px_1px_rgba(25,28,33,0.08)]   p-6">
             <div className="flex items-center justify-between">
-              <div className="p-2 bg-green-100 rounded-lg">
+              <div className="p-2 bg-green-100 rounded-md">
                 <Users className="w-5 h-5 text-green-600" />
               </div>
               <span className="text-2xl font-bold text-gray-900">
@@ -304,7 +308,7 @@ const Home = () => {
               <button
                 onClick={createSession}
                 disabled={loading}
-                className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-medium py-3 px-4 rounded-xl transition-colors duration-200 flex items-center justify-center space-x-2 mb-6"
+                className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-medium py-3 px-4 rounded-md transition-colors duration-200 flex items-center justify-center space-x-2 mb-6"
               >
                 {loading ? (
                   <>
@@ -356,6 +360,7 @@ const Home = () => {
       </div>
 
       {/* QR Code Modal */}
+      {/* QR Code Modal */}
       {showQrModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full relative">
@@ -383,7 +388,7 @@ const Home = () => {
                   />
                 ) : (
                   <div className="w-48 h-48 bg-gray-200 rounded-lg flex items-center justify-center mx-auto">
-                    <QrCode className="w-12 h-12 text-gray-400" />
+                    <div className="w-8 h-8 border-4 border-gray-300 border-t-gray-600 rounded-full animate-spin"></div>
                   </div>
                 )}
               </div>

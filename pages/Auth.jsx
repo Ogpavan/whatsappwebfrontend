@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { PiEyeBold, PiEyeClosed } from "react-icons/pi";
 import { auth, googleProvider } from "../src/firebase";
 import {
   updateProfile,
@@ -6,11 +7,12 @@ import {
   createUserWithEmailAndPassword,
   signInWithPopup,
   fetchSignInMethodsForEmail,
-  sendEmailVerification
+  sendEmailVerification,
+  sendPasswordResetEmail,
 } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import Swal from "sweetalert2"; // <-- Add this import
+import Swal from "sweetalert2";
 
 const AuthPage = () => {
   const [isSignUp, setIsSignUp] = useState(false);
@@ -18,13 +20,14 @@ const AuthPage = () => {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [err, setErr] = useState("");
+  const [loadingBtn, setLoadingBtn] = useState(false); // <-- loading for button
+  const [showPassword, setShowPassword] = useState(false); // <-- toggle for password
+  const [resetLoading, setResetLoading] = useState(false);
   const navigate = useNavigate();
   const { user, loading } = useAuth();
 
   useEffect(() => {
     if (user) {
-      // Don't show any messages here during signup flow
-      // Just handle automatic navigation for verified users
       if (user.emailVerified) {
         navigate("/");
       } else {
@@ -45,11 +48,10 @@ const AuthPage = () => {
     return null;
   }
 
-  // Validation helper
   const validate = () => {
     if (!email.trim()) return "Email is required.";
-    // Simple email regex for demonstration
-    if (!/^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$/.test(email)) return "Enter a valid email.";
+    if (!/^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$/.test(email))
+      return "Enter a valid email.";
     if (!password) return "Password is required.";
     if (isSignUp) {
       if (!name.trim()) return "Name is required for signup.";
@@ -58,10 +60,10 @@ const AuthPage = () => {
     return "";
   };
 
-  // Update handleEmailAuth function
   const handleEmailAuth = async (e) => {
     e.preventDefault();
     setErr("");
+    setLoadingBtn(true); // <-- start loading
     const validationError = validate();
     if (validationError) {
       Swal.fire({
@@ -69,37 +71,37 @@ const AuthPage = () => {
         title: "Validation Error",
         text: validationError,
       });
+      setLoadingBtn(false); // <-- stop loading
       return;
     }
 
     try {
       if (isSignUp) {
-        // Check if email already exists
-        const signInMethods = await fetchSignInMethodsForEmail(auth, email.trim());
+        const signInMethods = await fetchSignInMethodsForEmail(
+          auth,
+          email.trim()
+        );
         if (signInMethods.length > 0) {
           Swal.fire({
             icon: "warning",
             title: "Email Already Exists",
             text: "This email is already registered. Please use a different email or sign in.",
           });
+          setLoadingBtn(false); // <-- stop loading
           return;
         }
 
-        // Create new account
-        const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
-        
-        // Update profile with name
+        const userCredential = await createUserWithEmailAndPassword(
+          auth,
+          email.trim(),
+          password
+        );
         await updateProfile(userCredential.user, {
           displayName: name.trim(),
         });
-        
-        // Send email verification
         await sendEmailVerification(userCredential.user);
-        
-        // Sign out immediately
         await auth.signOut();
 
-        // Show success message and redirect to sign in
         await Swal.fire({
           icon: "success",
           title: "Account Created Successfully!",
@@ -111,73 +113,72 @@ const AuthPage = () => {
           confirmButtonText: "Go to Sign In",
           allowOutsideClick: false,
         }).then(() => {
-          // Reset form and switch to sign in mode
           setEmail("");
           setPassword("");
           setName("");
           setIsSignUp(false);
         });
+        setLoadingBtn(false); // <-- stop loading
         return;
       } else {
-        // Handle sign in
-        const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
-        
-        // Check if email is verified
+        const userCredential = await signInWithEmailAndPassword(
+          auth,
+          email.trim(),
+          password
+        );
         if (!userCredential.user.emailVerified) {
-          // Send new verification email
           await sendEmailVerification(userCredential.user);
-          
-          // Sign out immediately
           await auth.signOut();
-          
           Swal.fire({
             icon: "warning",
             title: "Email Not Verified",
             text: "Please check your email to verify your account. We've sent a new verification link.",
             confirmButtonColor: "#1a4947",
-            confirmButtonText: "OK"
+            confirmButtonText: "OK",
           });
+          setLoadingBtn(false); // <-- stop loading
           return;
         }
-
-        // Only navigate if email is verified
         Swal.fire({
           icon: "success",
           title: "Welcome Back!",
           text: "You have successfully logged in.",
           timer: 1500,
-          showConfirmButton: false
+          showConfirmButton: false,
         });
         navigate("/");
       }
     } catch (error) {
       let errorMessage;
       switch (error.code) {
-        case 'auth/email-already-in-use':
-          errorMessage = "This email is already registered. Please sign in instead.";
+        case "auth/email-already-in-use":
+          errorMessage =
+            "This email is already registered. Please sign in instead.";
           break;
-        case 'auth/invalid-email':
+        case "auth/invalid-email":
           errorMessage = "Please enter a valid email address.";
           break;
-        case 'auth/operation-not-allowed':
-          errorMessage = "Email/password accounts are not enabled. Please contact support.";
+        case "auth/operation-not-allowed":
+          errorMessage =
+            "Email/password accounts are not enabled. Please contact support.";
           break;
-        case 'auth/weak-password':
+        case "auth/weak-password":
           errorMessage = "Please choose a stronger password.";
           break;
         default:
           errorMessage = "An error occurred. Please try again.";
       }
-
       Swal.fire({
         icon: "error",
         title: "Authentication Error",
-        text: errorMessage
+        text: errorMessage,
       });
     }
+    setLoadingBtn(false); // <-- stop loading
   };
 
   const handleGoogle = async () => {
+    setLoadingBtn(true);
     try {
       await signInWithPopup(auth, googleProvider);
       navigate("/");
@@ -185,9 +186,32 @@ const AuthPage = () => {
       Swal.fire({
         icon: "error",
         title: "Authentication Error",
-        text: error.message.replace(/^Firebase: /, "").replace(/\(auth\/.*\)\.?/, ""),
+        text: error.message
+          .replace(/^Firebase: /, "")
+          .replace(/\(auth\/.*\)\.?/, ""),
       });
     }
+    setLoadingBtn(false);
+  };
+
+  const handleForgotPassword = async () => {
+    if (!email) {
+      setErr("Please enter your email to reset password.");
+      return;
+    }
+    setResetLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, email.trim());
+      setErr("");
+      Swal.fire({
+        icon: "success",
+        title: "Reset Email Sent",
+        text: "Check your inbox for a password reset link.",
+      });
+    } catch (error) {
+      setErr("Failed to send reset email. Please check your email address.");
+    }
+    setResetLoading(false);
   };
 
   const toggleMode = () => {
@@ -199,17 +223,13 @@ const AuthPage = () => {
   };
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center p-4"
-      // style={{
-      //   backgroundImage: "url('/backgound.jpg')",
-      //   backgroundSize: "cover",
-      //   backgroundPosition: "center",
-      //   backgroundRepeat: "no-repeat",
-      // }}
-    >
-      <img src="/background.jpg" alt="Background" className="absolute inset-0 w-full h-full object-cover opacity-10" />
-            <div className="bg-white rounded-3xl shadow-2xl overflow-hidden w-full max-w-4xl min-h-[600px] relative">
+    <div className="min-h-screen flex items-center justify-center p-4">
+      <img
+        src="/background.jpg"
+        alt="Background"
+        className="absolute inset-0 w-full h-full object-cover opacity-10"
+      />
+      <div className="bg-white rounded-3xl shadow-2xl overflow-hidden w-full max-w-4xl min-h-[600px] relative">
         {/* Sliding Green Panel */}
         <div
           className={`absolute top-0 w-1/2 h-full flex flex-col justify-center items-center text-center text-white overflow-hidden transition-all duration-700 ease-in-out z-10 ${
@@ -250,7 +270,10 @@ const AuthPage = () => {
             isSignUp ? "left-0" : "left-1/2"
           }`}
         >
-          <form className="max-w-sm mx-auto w-full px-12" onSubmit={handleEmailAuth}>
+          <form
+            className="max-w-sm mx-auto w-full px-12"
+            onSubmit={handleEmailAuth}
+          >
             <h3 className="text-3xl font-bold text-gray-800 mb-8 text-center">
               {isSignUp ? "Sign up for MSGen" : "Sign in to MSGen"}
             </h3>
@@ -260,18 +283,54 @@ const AuthPage = () => {
                 type="button"
                 onClick={handleGoogle}
                 className="w-full flex items-center justify-center gap-2 border border-gray-300 rounded-full py-2 px-4 font-semibold text-gray-700 bg-white hover:bg-gray-50 transition-colors shadow-sm"
+                disabled={loadingBtn}
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24">
-                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                  <path
+                    fill="#4285F4"
+                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                  />
                 </svg>
                 <span>Continue with Google</span>
+                {loadingBtn && (
+                  <svg
+                    className="animate-spin ml-2 h-4 w-4 text-gray-500"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                      fill="none"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8v8z"
+                    />
+                  </svg>
+                )}
               </button>
             </div>
             <div className="text-center text-gray-500 mb-6 ">
-              {isSignUp ? "or use your email for registration" : "or use your email account"}
+              {isSignUp
+                ? "or use your email for registration"
+                : "or use your email account"}
             </div>
             {/* Error Message */}
             {err && (
@@ -303,16 +362,24 @@ const AuthPage = () => {
                 required
               />
             </div>
-            {/* Password Field */}
+            {/* Password Field with toggle */}
             <div className="relative mt-4">
               <input
-                type="password"
+                type={showPassword ? "text" : "password"}
                 placeholder="Password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-100 border-none rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1a4947] transition-all"
+                className="w-full px-4 py-3 bg-gray-100 border-none rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1a4947] transition-all pr-12"
                 required
               />
+              <button
+                type="button"
+                tabIndex={-1}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                onClick={() => setShowPassword((v) => !v)}
+              >
+                {showPassword ? <PiEyeClosed /> : <PiEyeBold />}
+              </button>
             </div>
             {/* Forgot Password */}
             {!isSignUp && (
@@ -320,17 +387,47 @@ const AuthPage = () => {
                 <button
                   type="button"
                   className="text-gray-500 text-sm hover:text-[#1a4947] transition-colors"
+                  onClick={handleForgotPassword}
+                  disabled={resetLoading}
                 >
-                  Forgot your password?
+                  {resetLoading ? "Sending..." : "Forgot your password?"}
                 </button>
               </div>
             )}
-            {/* Submit Button */}
+            {/* Submit Button with loading */}
             <button
               type="submit"
-              className="w-full bg-[#1a4947] text-white py-3 rounded-full font-semibold tracking-wide hover:bg-[#163d3c] transition-all duration-300 transform hover:scale-105 shadow-lg mt-6"
+              className="w-full bg-[#1a4947] text-white py-3 rounded-full font-semibold tracking-wide hover:bg-[#163d3c] transition-all duration-300 transform hover:scale-105 shadow-lg mt-6 flex items-center justify-center"
+              disabled={loadingBtn}
             >
-              {isSignUp ? "SIGN UP" : "SIGN IN"}
+              {loadingBtn ? (
+                <>
+                  <svg
+                    className="animate-spin h-5 w-5 mr-2 text-white"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                      fill="none"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8v8z"
+                    />
+                  </svg>
+                  {isSignUp ? "Signing Up..." : "Signing In..."}
+                </>
+              ) : isSignUp ? (
+                "SIGN UP"
+              ) : (
+                "SIGN IN"
+              )}
             </button>
           </form>
         </div>
@@ -338,20 +435,73 @@ const AuthPage = () => {
         {/* WhatsApp-style background shapes */}
         <div className="absolute inset-0 -z-10 overflow-hidden pointer-events-none">
           {/* Animated WhatsApp-style chat bubble */}
-          <svg className="absolute left-10 top-10 animate-bounce-slow" width="80" height="80" viewBox="0 0 80 80" fill="none">
-            <ellipse cx="40" cy="40" rx="36" ry="30" fill="#1a4947" opacity="0.12"/>
-            <ellipse cx="60" cy="60" rx="10" ry="8" fill="#1a4947" opacity="0.18"/>
+          <svg
+            className="absolute left-10 top-10 animate-bounce-slow"
+            width="80"
+            height="80"
+            viewBox="0 0 80 80"
+            fill="none"
+          >
+            <ellipse
+              cx="40"
+              cy="40"
+              rx="36"
+              ry="30"
+              fill="#1a4947"
+              opacity="0.12"
+            />
+            <ellipse
+              cx="60"
+              cy="60"
+              rx="10"
+              ry="8"
+              fill="#1a4947"
+              opacity="0.18"
+            />
           </svg>
           {/* Animated double tick */}
-          <svg className="absolute right-16 top-32 animate-pulse" width="48" height="24" viewBox="0 0 48 24" fill="none">
-            <path d="M2 12l8 8 12-16" stroke="#1a4947" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" opacity="0.3"/>
-            <path d="M18 16l8 8 18-22" stroke="#1a4947" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" opacity="0.5"/>
+          <svg
+            className="absolute right-16 top-32 animate-pulse"
+            width="48"
+            height="24"
+            viewBox="0 0 48 24"
+            fill="none"
+          >
+            <path
+              d="M2 12l8 8 12-16"
+              stroke="#1a4947"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              opacity="0.3"
+            />
+            <path
+              d="M18 16l8 8 18-22"
+              stroke="#1a4947"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              opacity="0.5"
+            />
           </svg>
           {/* Animated circle */}
           <div className="absolute bottom-20 left-24 w-16 h-16 bg-[#1a4947] rounded-full opacity-10 animate-pulse"></div>
           {/* Small chat bubble */}
-          <svg className="absolute bottom-10 right-10 animate-bounce" width="40" height="40" viewBox="0 0 40 40" fill="none">
-            <ellipse cx="20" cy="20" rx="16" ry="12" fill="#1a4947" opacity="0.15"/>
+          <svg
+            className="absolute bottom-10 right-10 animate-bounce"
+            width="40"
+            height="40"
+            viewBox="0 0 40 40"
+            fill="none"
+          >
+            <ellipse
+              cx="20"
+              cy="20"
+              rx="16"
+              ry="12"
+              fill="#1a4947"
+              opacity="0.15"
+            />
           </svg>
         </div>
       </div>

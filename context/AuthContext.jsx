@@ -28,6 +28,10 @@ export function AuthProvider({ children }) {
     return unsubscribe;
   }, []);
 
+  useEffect(() => {
+    console.log("Firebase User:", user);
+  }, [user]);
+
   const signOut = async () => {
     await firebaseSignOut(auth);
     setUser(null);
