@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useSession } from "../context/SessionContext";
+import { useAuth } from "../context/AuthContext";
 import { FiPaperclip } from "react-icons/fi";
 import { FaPaperPlane } from "react-icons/fa";
 
@@ -25,20 +26,20 @@ const SendMessage = () => {
   const audioRef = useRef(null);
   const fileInputRef = useRef();
 
-  const { selectedSession, setSelectedSession } = useSession();
+  const { sessions, selectedSession, setSelectedSession } = useSession();
+  const { user } = useAuth();
 
   const fetchSessions = async () => {
-    try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/sessions`);
-      const data = await res.json();
-      console.log("Fetched sessions:", data);
-      const validSessions = data.sessions || [];
-      setAvailableSessions(validSessions);
-      if (!selectedSession && validSessions.length > 0) {
-        setSelectedSession(validSessions[0].sessionId);
-      }
-    } catch (err) {
-      console.error("Failed to fetch sessions", err);
+    if (!user || !user.uid) return;
+    const res = await fetch(
+      `${import.meta.env.VITE_API_URL}/sessions?userId=${user.uid}`
+    );
+    const data = await res.json();
+    console.log("Fetched sessions:", data);
+    const validSessions = data.sessions || [];
+    setAvailableSessions(validSessions);
+    if (!selectedSession && validSessions.length > 0) {
+      setSelectedSession(validSessions[0].sessionId);
     }
   };
 
@@ -86,7 +87,6 @@ const SendMessage = () => {
     setSending(true);
     setBtnAnim(true);
 
-    // Play sound
     if (audioRef.current) {
       audioRef.current.currentTime = 0;
       audioRef.current.play();
@@ -95,7 +95,7 @@ const SendMessage = () => {
     const formData = new FormData();
     formData.append("sessionId", selectedSession);
     formData.append("number", number);
-    if (message) formData.append("message", message);
+    formData.append("message", message);
     if (media) formData.append("media", media);
 
     try {
@@ -107,10 +107,10 @@ const SendMessage = () => {
       setMessage("");
       setMedia(null);
     } catch (err) {
-      alert("Failed to send");
+      alert("Failed to send message");
     } finally {
-      setTimeout(() => setBtnAnim(false), 300); // Reset animation after 300ms
       setSending(false);
+      setBtnAnim(false);
     }
   };
 
